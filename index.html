@@ -655,12 +655,57 @@ document.querySelectorAll('.copy-button').forEach(function(button){
  const form=document.getElementById('rsvpForm'); if(!form)return;
  const attendanceInputs=form.querySelectorAll('input[name="attendance"]');
  const countWrap=document.getElementById('guestCountWrap');
- function updateCount(){const selected=form.querySelector('input[name="attendance"]:checked');countWrap.hidden=!!selected&&selected.value!=='Hadir';}
- attendanceInputs.forEach(input=>input.addEventListener('change',updateCount)); updateCount();
- const params=new URLSearchParams(window.location.search);const guest=params.get('to');if(guest&&guest.trim())document.getElementById('rsvpName').value=guest.trim();
- form.addEventListener('submit',function(e){e.preventDefault();const data=new FormData(form);const attendance=data.get('attendance');const count=attendance==='Hadir'?data.get('guestCount'):'0';const name=String(data.get('name')||'').trim();
- document.getElementById('rsvpSuccess').hidden=false;
- document.getElementById('rsvpSuccess').innerHTML='<strong>Terima kasih, '+name.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))+'!</strong><br>Konfirmasi Anda sudah ditampilkan di mockup ini. Untuk versi website final, data RSVP akan dihubungkan ke penyimpanan online agar Monika dapat melihat daftar konfirmasi.';
+ const submitButton=form.querySelector('button[type="submit"]');
+ const successBox=document.getElementById('rsvpSuccess');
+ const endpoint='https://script.google.com/macros/s/AKfycbww4YoEZ_9x9BmjZPss4MkGirKetYBNixqBfsCVHnmCYgEoBHYC0gakRsoFC9CAV10P/exec';
+
+ function updateCount(){
+   const selected=form.querySelector('input[name="attendance"]:checked');
+   countWrap.hidden=!!selected&&selected.value!=='Hadir';
+ }
+ attendanceInputs.forEach(input=>input.addEventListener('change',updateCount));
+ updateCount();
+
+ const params=new URLSearchParams(window.location.search);
+ const guest=params.get('to');
+ if(guest&&guest.trim())document.getElementById('rsvpName').value=guest.trim();
+
+ form.addEventListener('submit',async function(e){
+   e.preventDefault();
+   const data=new FormData(form);
+   const attendance=String(data.get('attendance')||'').trim();
+   const name=String(data.get('name')||'').trim();
+   const count=attendance==='Hadir'?String(data.get('guestCount')||'1'):'0';
+
+   if(!name||!['Hadir','Tidak hadir'].includes(attendance)){
+     successBox.hidden=false;
+     successBox.textContent='Mohon lengkapi nama dan konfirmasi kehadiran.';
+     return;
+   }
+
+   const safeName=name.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+   if(submitButton){submitButton.disabled=true;submitButton.style.opacity='.7';}
+   successBox.hidden=false;
+   successBox.textContent='Mengirim konfirmasi Anda…';
+
+   try{
+     const payload=new URLSearchParams();
+     payload.set('name',name);
+     payload.set('attendance',attendance);
+     payload.set('guestCount',count);
+
+     // Apps Script accepts form-encoded POST parameters. no-cors prevents
+     // cross-origin response reading; it does not provide server-side confirmation.
+     await fetch(endpoint,{method:'POST',mode:'no-cors',body:payload});
+
+     successBox.innerHTML='<strong>Terima kasih, '+safeName+'!</strong><br>Konfirmasi Anda sudah dikirim. Jika nama tidak cocok dengan daftar undangan, data mungkin perlu diperiksa oleh tuan rumah.';
+     form.reset();
+     updateCount();
+   }catch(err){
+     successBox.textContent='Konfirmasi belum dapat dikirim. Periksa koneksi internet Anda lalu coba kembali.';
+   }finally{
+     if(submitButton){submitButton.disabled=false;submitButton.style.opacity='';}
+   }
  });
 })();
 </script>
