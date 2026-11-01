@@ -763,7 +763,78 @@ document.querySelectorAll('.copy-button').forEach(function(button){
  </div>
 </section>
 <script>
-(function(){const form=document.getElementById('wishesForm');if(!form)return;const list=document.getElementById('wishesList');const empty=document.getElementById('wishesEmpty');form.addEventListener('submit',function(e){e.preventDefault();const name=document.getElementById('wishName').value.trim();const message=document.getElementById('wishMessage').value.trim();if(!name||!message)return;empty?.remove();const card=document.createElement('article');card.className='wish-card';const who=document.createElement('strong');who.textContent=name;const msg=document.createElement('p');msg.textContent=message;card.append(who,msg);list.append(card);form.reset();card.scrollIntoView({behavior:'smooth',block:'center'});});})();
+(function(){
+ const form=document.getElementById('wishesForm');
+ if(!form)return;
+ const list=document.getElementById('wishesList');
+ const empty=document.getElementById('wishesEmpty');
+ const nameInput=document.getElementById('wishName');
+ const messageInput=document.getElementById('wishMessage');
+ const submitButton=form.querySelector('button[type="submit"]');
+ const endpoint='https://script.google.com/macros/s/AKfycbww4YoEZ_9x9BmjZPss4MkGirKetYBNixqBfsCVHnmCYgEoBHYC0gakRsoFC9CAV10P/exec';
+ const status=document.createElement('p');
+ status.className='wishes-note';
+ status.setAttribute('role','status');
+ status.setAttribute('aria-live','polite');
+ form.appendChild(status);
+
+ function renderWishes(items){
+   list.querySelectorAll('.wish-card').forEach(card=>card.remove());
+   if(!Array.isArray(items)||items.length===0){
+     if(!document.getElementById('wishesEmpty')){
+       const note=document.createElement('div');
+       note.className='wish-empty';note.id='wishesEmpty';
+       note.textContent='Ucapan dan doa dari keluarga serta sahabat akan menjadi kenangan indah bagi Monika & Kevin. ♡';
+       list.appendChild(note);
+     }
+     return;
+   }
+   document.getElementById('wishesEmpty')?.remove();
+   items.forEach(item=>{
+     const card=document.createElement('article');card.className='wish-card';
+     const who=document.createElement('strong');who.textContent=String(item.name||'');
+     const msg=document.createElement('p');msg.textContent=String(item.message||'');
+     card.append(who,msg);list.appendChild(card);
+   });
+ }
+
+ // JSONP read: allows the public website to retrieve published wishes from Apps Script.
+ window.weddingWishesCallback=function(data){
+   if(data&&data.success)renderWishes(data.wishes||[]);
+   else status.textContent='Ucapan belum dapat dimuat. Silakan muat ulang halaman.';
+ };
+ function loadWishes(){
+   const old=document.getElementById('wishesDataScript');
+   if(old)old.remove();
+   const script=document.createElement('script');
+   script.id='wishesDataScript';
+   script.src=endpoint+'?callback=weddingWishesCallback&_='+Date.now();
+   script.onerror=function(){status.textContent='Daftar ucapan belum dapat dimuat. Periksa koneksi internet Anda.';};
+   document.head.appendChild(script);
+ }
+ loadWishes();
+
+ form.addEventListener('submit',async function(e){
+   e.preventDefault();
+   const name=nameInput.value.trim();
+   const message=messageInput.value.trim();
+   if(!name||!message)return;
+   if(submitButton){submitButton.disabled=true;submitButton.textContent='MENGIRIM...';}
+   status.textContent='Mengirim ucapan Anda...';
+   try{
+     const payload=new URLSearchParams();
+     payload.set('action','wish');payload.set('name',name);payload.set('message',message);
+     await fetch(endpoint,{method:'POST',mode:'no-cors',body:payload});
+     form.reset();
+     status.textContent='Terima kasih! Ucapan Anda sudah dikirim. ♡';
+     loadWishes();
+   }catch(err){
+     status.textContent='Ucapan belum dapat dikirim. Periksa koneksi internet lalu coba kembali.';
+   }finally{
+     if(submitButton){submitButton.disabled=false;submitButton.textContent='KIRIM UCAPAN';}
+   }
+ });
+})();
 </script>
 
 <section aria-label="Penutup undangan" class="mk-closing">
